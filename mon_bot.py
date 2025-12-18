@@ -6,7 +6,7 @@ import json
 import os
 import pytz
 
-
+# --- CONFIGURATION ---
 TOKEN = "your_actual_token_here"
 SERVER_ID = your_server_id_here      
 CHANNEL_ID = your_channel_id_here
@@ -19,6 +19,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 FICHIER_SAUVEGARDE = "devoirs.json"
 liste_devoirs = []
 
+# --- FONCTIONS DE GESTION DES DONNÉES ---
 def charger_donnees():
     global liste_devoirs
     if os.path.exists(FICHIER_SAUVEGARDE):
@@ -37,6 +38,7 @@ def charger_donnees():
         liste_devoirs = []
 
 def sauvegarder_donnees():
+    liste_devoirs.sort(key=lambda x: x['date'])
     data_to_save = []
     for d in liste_devoirs:
         copie = d.copy()
@@ -45,6 +47,7 @@ def sauvegarder_donnees():
     with open(FICHIER_SAUVEGARDE, "w", encoding="utf-8") as f:
         json.dump(data_to_save, f, indent=4, ensure_ascii=False)
 
+# --- COMMANDES SLASH ---
 @bot.tree.command(name="ajouter", description="Ajoute un nouveau devoir")
 @app_commands.describe(date="Format JJ/MM/AAAA", description="Description")
 async def ajouter(interaction: discord.Interaction, date: str, description: str):
@@ -69,25 +72,30 @@ async def devoir(interaction: discord.Interaction):
         await interaction.response.send_message("🎉 Aucun devoir !")
         return
 
-    liste_triee = sorted(liste_devoirs, key=lambda x: x['date'])
-    message = "**📅 Devoirs :**\n"
-    for d in liste_triee:
+    liste_devoirs.sort(key=lambda x: x['date'])
+    
+    message = "**📅 Liste des devoirs :**\n"
+    for i, d in enumerate(liste_devoirs, 1):
         date_fr = d['date'].strftime("%d/%m/%Y")
-        message += f"- **{date_fr}** : {d['desc']} ({d['auteur']})\n"
+        message += f"`{i}.` **{date_fr}** : {d['desc']} (par {d['auteur']})\n"
+    
     await interaction.response.send_message(message)
     
 @bot.tree.command(name="supprimer", description="Supprime un devoir par son numéro")
-@app_commands.describe(numero="Le numéro du devoir à supprimer (voir liste)")
+@app_commands.describe(numero="Le numéro affiché dans la liste /devoir")
 async def supprimer(interaction: discord.Interaction, numero: int):
+    liste_devoirs.sort(key=lambda x: x['date'])
+
     if 0 < numero <= len(liste_devoirs):
         devoir_supprime = liste_devoirs.pop(numero - 1) 
         sauvegarder_donnees()
         
         date_fr = devoir_supprime['date'].strftime("%d/%m/%Y")
-        await interaction.response.send_message(f"🗑️ Devoir supprimé : **{devoir_supprime['desc']}** (pour le {date_fr})")
+        await interaction.response.send_message(f"🗑️ Devoir supprimé : **{devoir_supprime['desc']}** (était prévu pour le {date_fr})")
     else:
-        await interaction.response.send_message(f"❌ Numéro invalide. Il y a actuellement {len(liste_devoirs)} devoirs.", ephemeral=True)
+        await interaction.response.send_message(f"❌ Numéro {numero} invalide. Tape `/devoir` pour vérifier.", ephemeral=True)
 
+# --- EVENEMENTS ET BOUCLES ---
 @bot.event
 async def on_ready():
     print(f'[OK] Connecte en tant que {bot.user}')
@@ -98,9 +106,7 @@ async def on_ready():
         guild = discord.Object(id=SERVER_ID)
         bot.tree.copy_global_to(guild=guild)
         synced = await bot.tree.sync(guild=guild)
-        
-        print(f"[SUCCES] {len(synced)} commandes synchronisees sur le serveur !")
-        print("-> Va sur Discord, tape '/' et attends quelques secondes.")
+        print(f"[SUCCES] {len(synced)} commandes synchronisees !")
     except Exception as e:
         print(f"[ERREUR] Probleme de synchro : {e}")
 
@@ -120,13 +126,15 @@ async def verifier_dates():
     for d in liste_devoirs:
         delta = (d['date'] - aujourdhui).days
         if delta == 7 and not d.get('rappel_7j_fait'):
-            await channel.send(f"📢 Rappel : '{d['desc']}' dans 1 semaine !")
+            await channel.send(f"📢 **RAPPEL (J-7)** : '{d['desc']}' pour le {d['date'].strftime('%d/%m')}")
             d['rappel_7j_fait'] = True
             changement = True
         elif delta == 1 and not d.get('rappel_1j_fait'):
-            await channel.send(f"🚨 Urgent : '{d['desc']}' pour DEMAIN !")
+            await channel.send(f"🚨 **URGENT (DEMAIN)** : '{d['desc']}' !")
             d['rappel_1j_fait'] = True
             changement = True
-    if changement: sauvegarder_donnees()
+            
+    if changement: 
+        sauvegarder_donnees()
 
 bot.run(TOKEN)
