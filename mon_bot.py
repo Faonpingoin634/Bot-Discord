@@ -18,6 +18,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 FICHIER_SAUVEGARDE = "devoirs.json"
 liste_devoirs = []
+bot_est_pret = False
 
 # --- FONCTIONS DE GESTION DES DONNÉES ---
 def charger_donnees():
@@ -49,10 +50,17 @@ def sauvegarder_donnees():
 
 # --- COMMANDES SLASH ---
 @bot.tree.command(name="ajouter", description="Ajoute un nouveau devoir")
-@app_commands.describe(date="Format JJ/MM/AAAA", description="Description")
+@app_commands.describe(date="Format JJ/MM/AAAA", description="Description du devoir")
 async def ajouter(interaction: discord.Interaction, date: str, description: str):
     try:
         date_butoir = datetime.datetime.strptime(date, "%d/%m/%Y").date()
+        
+        paris_tz = pytz.timezone("Europe/Paris")
+        aujourdhui = datetime.datetime.now(paris_tz).date()
+        if date_butoir < aujourdhui:
+             await interaction.response.send_message("⚠️ Tu essaies d'ajouter un devoir pour une date déjà passée !", ephemeral=True)
+             return
+
         nouveau_devoir = {
             "date": date_butoir,
             "desc": description,
@@ -98,10 +106,16 @@ async def supprimer(interaction: discord.Interaction, numero: int):
 # --- EVENEMENTS ET BOUCLES ---
 @bot.event
 async def on_ready():
+    global bot_est_pret
+
+    if bot_est_pret:
+        print(f"[INFO] Reconnexion détectée. Pas de resynchronisation.")
+        return
+
     print(f'[OK] Connecte en tant que {bot.user}')
     charger_donnees()
 
-    print("[WAIT] Debut de la synchronisation...")
+    print("[WAIT] Debut de la synchronisation des commandes...")
     try:
         guild = discord.Object(id=SERVER_ID)
         bot.tree.copy_global_to(guild=guild)
@@ -112,6 +126,8 @@ async def on_ready():
 
     if not verifier_dates.is_running():
         verifier_dates.start()
+    
+    bot_est_pret = True
 
 @tasks.loop(hours=1)
 async def verifier_dates():
@@ -122,9 +138,18 @@ async def verifier_dates():
     paris_tz = pytz.timezone("Europe/Paris")
     aujourdhui = datetime.datetime.now(paris_tz).date() 
 
+    global liste_devoirs
+    devoirs_a_garder = []
     changement = False
+
     for d in liste_devoirs:
         delta = (d['date'] - aujourdhui).days
+        
+        if delta < 0:
+            print(f"[AUTO-DELETE] Suppression du devoir : {d['desc']} (Date: {d['date']})")
+            changement = True
+            continue 
+
         if delta == 7 and not d.get('rappel_7j_fait'):
             await channel.send(f"📢 **RAPPEL (J-7)** : '{d['desc']}' pour le {d['date'].strftime('%d/%m')}")
             d['rappel_7j_fait'] = True
@@ -133,8 +158,11 @@ async def verifier_dates():
             await channel.send(f"🚨 **URGENT (DEMAIN)** : '{d['desc']}' !")
             d['rappel_1j_fait'] = True
             changement = True
-            
-    if changement: 
+        
+        devoirs_a_garder.append(d)
+
+    if changement:
+        liste_devoirs = devoirs_a_garder
         sauvegarder_donnees()
 
 bot.run(TOKEN)
