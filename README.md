@@ -19,9 +19,13 @@ Ce projet est un bot Discord écrit en Python, conçu pour la gestion et le suiv
 
 ## 📂 Structure du projet
 
-* `mon_bot.py` : Le cœur du bot contenant la logique, les commandes et les boucles de vérification.
+* `mon_bot.py` : Point d'entrée : création du bot et synchronisation des commandes.
+* `commandes_devoirs.py` : Commandes slash (`/ajouter`, `/devoir`, `/supprimer`) et boucle de rappels.
+* `stockage.py` : Modèle `Devoir` et sauvegarde dans `devoirs.json`.
+* `config.py` : Lecture de la configuration (token, IDs) depuis les variables d'environnement.
 * `devoirs.json` : Base de données locale (créée automatiquement si absente).
-* `requirements.txt` : Liste des dépendances (`discord.py`, `pytz`).
+* `.env.example` : Modèle du fichier `.env` à créer.
+* `requirements.txt` : Liste des dépendances (`discord.py`, `pytz`, `python-dotenv`).
 * `discloud.config` : Configuration pour l'hébergeur Discloud.
 
 ## 💻 Commandes Disponibles
@@ -47,10 +51,10 @@ Avant de commencer, assurez-vous d'avoir installé **Python 3.8+**.
     pip install -r requirements.txt
     ```
 
-3.  **Configuration du Token**
-    * Ouvrez `mon_bot.py`.
-    * Remplacez la variable `TOKEN` par votre token de bot (disponible sur le [Discord Developer Portal](https://discord.com/developers/applications)).
-    * ⚠️ **Important :** Si vous rendez ce code public, ne mettez pas le token en clair ! Utilisez des variables d'environnement.
+3.  **Configuration**
+    * Copiez `.env.example` en `.env`.
+    * Renseignez `TOKEN` (disponible sur le [Discord Developer Portal](https://discord.com/developers/applications)), `SERVER_ID` (ID du serveur) et `CHANNEL_ID` (ID du salon des rappels).
+    * ⚠️ **Important :** Le fichier `.env` est ignoré par git : ne le publiez jamais.
 
 4.  **Lancer le bot**
     ```bash
@@ -62,9 +66,11 @@ Avant de commencer, assurez-vous d'avoir installé **Python 3.8+**.
 Ce bot est optimisé pour **Discloud**.
 
 1.  Assurez-vous que le fichier `discloud.config` est présent.
-2.  Dans le fichier `mon_bot.py`, il est recommandé d'utiliser `os.getenv("TOKEN")` et de configurer votre token dans l'onglet **ENV** de Discloud pour plus de sécurité.
-3.  Uploadez le dossier (ou un fichier `.zip` contenant le dossier) sur votre dashboard Discloud.
+2.  Créez le fichier `.env` (à partir de `.env.example`) à la racine du projet, à côté de `discloud.config` : c'est ainsi que Discloud transmet le token et les IDs au bot.
+3.  Compressez le contenu du dossier en `.zip` (avec le `.env`, sans `__pycache__` ni environnement virtuel) et uploadez-le sur votre dashboard Discloud.
 4.  Le bot tournera 24/7, vérifiera les dates toutes les heures et nettoiera les anciens devoirs automatiquement.
+
+> ⚠️ Lors d'une mise à jour, n'incluez pas `devoirs.json` dans le `.zip` : il écraserait les devoirs enregistrés sur Discloud. Le bot le recrée tout seul s'il est absent.
 
 ## 🤝 Contribution
 
